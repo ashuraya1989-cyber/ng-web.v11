@@ -1,0 +1,12 @@
+# Ignore backend files when deploying to Vercel
+backend/
+scripts/
+Dockerfile
+Dockerfile.frontend
+docker-compose.yml
+nginx.conf
+setup.bat
+setup.sh
+.env.example
+*.md
+!README.md

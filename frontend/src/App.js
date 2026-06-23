@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
+import { Analytics } from '@vercel/analytics/react';
 
 // Public pages
 import HomePage from './pages/HomePage';
@@ -102,6 +103,7 @@ function App() {
                 </Routes>
                 <Toaster position="top-right" />
             </div>
+            <Analytics />
         </Router>
     );
 }

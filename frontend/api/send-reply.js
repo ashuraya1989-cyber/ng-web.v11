@@ -1,5 +1,10 @@
 import { requireAdmin, getEmailProvider } from './_lib/admin.js';
 
+const escapeHtml = (str) =>
+  String(str || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
 function getSafeSender(provider) {
   const name  = provider.sender_name  || 'Nisha Goriel Photography';
   const email = provider.sender_email || '';
@@ -291,9 +296,9 @@ export default async function handler(req, res) {
   const sender      = getSafeSender(provider);
   const subject     = `Re: Din förfrågan – ${sender.name}`;
   const html        = buildReplyHtml(
-    name || 'there',
-    originalMessage || '',
-    replyText,
+    escapeHtml(name || 'there'),
+    escapeHtml(originalMessage || ''),
+    escapeHtml(replyText),
     sender.name
   );
 
@@ -385,7 +390,7 @@ export default async function handler(req, res) {
         const nodemailer = require('nodemailer');
         const { smtp_host, smtp_port, smtp_username, smtp_password } = provider;
         if (!smtp_host || !smtp_username || !smtp_password) return res.status(500).json({ error: 'SMTP: host, användarnamn och lösenord krävs' });
-        const t = nodemailer.createTransporter({ host: smtp_host, port: parseInt(smtp_port) || 587, secure: parseInt(smtp_port) === 465, auth: { user: smtp_username, pass: smtp_password } });
+        const t = nodemailer.createTransport({ host: smtp_host, port: parseInt(smtp_port) || 587, secure: parseInt(smtp_port) === 465, auth: { user: smtp_username, pass: smtp_password } });
         await t.sendMail({ from: sender.from, to, subject, html });
         return res.status(200).json({ success: true });
       }

@@ -283,7 +283,7 @@ export default async function handler(req, res) {
         const nodemailer = require('nodemailer');
         const { smtp_host, smtp_port, smtp_username, smtp_password } = provider;
         if (!smtp_host || !smtp_username || !smtp_password) return res.status(500).json({ error: 'SMTP: host, användarnamn och lösenord krävs' });
-        const t = nodemailer.createTransporter({ host: smtp_host, port: parseInt(smtp_port) || 587, secure: parseInt(smtp_port) === 465, auth: { user: smtp_username, pass: smtp_password } });
+        const t = nodemailer.createTransport({ host: smtp_host, port: parseInt(smtp_port) || 587, secure: parseInt(smtp_port) === 465, auth: { user: smtp_username, pass: smtp_password } });
         await t.sendMail({ from: sender.from, to: recipient, replyTo: customerReplyTo, subject, html });
         return res.status(200).json({ success: true });
       }

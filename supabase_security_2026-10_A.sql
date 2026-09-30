@@ -20,7 +20,7 @@ do $$
 declare n int;
 begin
   insert into public.admins (user_id)
-  select id from auth.users where email = 'info@nishagoriel.com';
+  select id from auth.users where email = 'nisha@nishagoriel.com';
   get diagnostics n = row_count;
   if n <> 1 then
     raise exception 'Hittade % konton för admin-e-posten, väntade exakt 1', n;

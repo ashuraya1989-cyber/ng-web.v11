@@ -1,24 +1,29 @@
-import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from './_lib/admin.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const { supabase } = auth;
 
-  if (!supabaseUrl || !serviceKey) {
-    console.error('Missing env vars:', { supabaseUrl: !!supabaseUrl, serviceKey: !!serviceKey });
-    return res.status(500).json({ error: 'Server not configured – SUPABASE_SERVICE_ROLE_KEY saknas i Vercel env vars' });
+  const { id, email_provider, ...updates } = req.body || {}; // id styrs aldrig av klienten
+  const now = new Date().toISOString();
+
+  // Mejlinställningarna ligger i den stängda tabellen email_settings
+  if (email_provider && typeof email_provider === 'object') {
+    const { error } = await supabase
+      .from('email_settings')
+      .upsert({ id: 'site_settings', email_provider, updated_at: now });
+    if (error) {
+      console.error('save-settings email_settings error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
   }
-
-  const supabase = createClient(supabaseUrl, serviceKey);
-
-  const updates = req.body;
-  delete updates.id; // never override primary key from client
 
   const { data, error } = await supabase
     .from('settings')
-    .upsert({ id: 'site_settings', ...updates, updated_at: new Date().toISOString() })
+    .upsert({ id: 'site_settings', ...updates, updated_at: now })
     .select()
     .single();
 

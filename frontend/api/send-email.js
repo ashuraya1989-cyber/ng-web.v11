@@ -1,9 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY
-);
+import { serviceClient, getEmailProvider } from './_lib/admin.js';
 
 const escapeHtml = (str) =>
   String(str || '')
@@ -180,14 +175,16 @@ export default async function handler(req, res) {
   };
 
   let settings = null;
+  let provider  = {};
   try {
+    const supabase = serviceClient();
     const { data, error } = await supabase
-      .from('settings').select('email_provider, recipient_email').eq('id', 'site_settings').single();
+      .from('settings').select('recipient_email').eq('id', 'site_settings').single();
     if (error) console.error('Settings fetch error:', error);
     else settings = data;
+    provider = await getEmailProvider(supabase);
   } catch (e) { console.error('Supabase error:', e); }
 
-  const provider  = settings?.email_provider || {};
   const recipient = settings?.recipient_email || process.env.RECIPIENT_EMAIL || 'info@nishagoriel.com';
   const sender    = getSafeSender(provider);
   const subject   = `✦ New Inquiry from ${safe.name}`;

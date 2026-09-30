@@ -1,9 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY
-);
+import { requireAdmin, getEmailProvider } from './_lib/admin.js';
 
 function getSafeSender(provider) {
   const name  = provider.sender_name  || 'Nisha Goriel Photography';
@@ -17,18 +12,13 @@ function getSafeSender(provider) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { to } = req.body;
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+
+  const { to } = req.body || {};
   if (!to) return res.status(400).json({ error: 'Missing recipient email' });
 
-  let settings = null;
-  try {
-    const { data, error } = await supabase
-      .from('settings').select('email_provider').eq('id', 'site_settings').single();
-    if (error) console.error('Settings fetch error:', error);
-    else settings = data;
-  } catch (e) { console.error('Supabase error:', e); }
-
-  const provider    = settings?.email_provider || {};
+  const provider    = await getEmailProvider(auth.supabase);
   const sender      = getSafeSender(provider);
   const subject     = '✅ Test – E-postkonfiguration fungerar!';
   const html        = `

@@ -1,9 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY
-);
+import { requireAdmin, getEmailProvider } from './_lib/admin.js';
 
 function getSafeSender(provider) {
   const name  = provider.sender_name  || 'Nisha Goriel Photography';
@@ -280,18 +275,19 @@ const buildReplyHtml = (name, originalMessage, replyText, senderName) => `<!DOCT
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { to, name, originalMessage, replyText } = req.body;
-  if (!to || !replyText) return res.status(400).json({ error: 'Missing required fields: to, replyText' });
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
 
-  let settings = null;
-  try {
-    const { data, error } = await supabase
-      .from('settings').select('email_provider').eq('id', 'site_settings').single();
-    if (error) console.error('Settings fetch error:', error);
-    else settings = data;
-  } catch (e) { console.error('Supabase error:', e); }
+  const { id, replyText } = req.body || {};
+  if (!id || !replyText) return res.status(400).json({ error: 'Missing required fields: id, replyText' });
 
-  const provider    = settings?.email_provider || {};
+  // Mottagaren tas från meddelandet i databasen, aldrig från klienten
+  const { data: msg, error: msgError } = await auth.supabase
+    .from('contact_messages').select('email, name, message').eq('id', id).single();
+  if (msgError || !msg?.email) return res.status(404).json({ error: 'Meddelandet hittades inte' });
+  const { email: to, name, message: originalMessage } = msg;
+
+  const provider    = await getEmailProvider(auth.supabase);
   const sender      = getSafeSender(provider);
   const subject     = `Re: Din förfrågan – ${sender.name}`;
   const html        = buildReplyHtml(

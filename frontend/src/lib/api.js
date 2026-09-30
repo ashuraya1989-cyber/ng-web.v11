@@ -8,6 +8,15 @@ import { supabase } from './supabase';
 // Base URL for Vercel API functions (empty string = relative URLs, correct for Vercel deployment)
 export const API_BASE_URL = '';
 
+// Headers for admin-only Vercel functions: the server verifies the login token
+const adminHeaders = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return {
+    'Content-Type': 'application/json',
+    ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+  };
+};
+
 // Helper to handle Supabase responses
 const handleResponse = async (promise) => {
   const { data, error } = await promise;
@@ -162,24 +171,11 @@ export const contactAPI = {
   markAsRead: (id) => handleResponse(supabase.from('contact_messages').update({ is_read: true }).eq('id', id)),
   deleteMessage: (id) => handleResponse(supabase.from('contact_messages').delete().eq('id', id)),
   replyToMessage: async (id, replyText) => {
-    // Fetch the original message to get the recipient's email
-    const { data: msg, error } = await supabase
-      .from('contact_messages')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-
-    // Send reply email via Vercel function
+    // The server looks up the recipient from the message itself
     const response = await fetch('/api/send-reply', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: msg.email,
-        name: msg.name,
-        originalMessage: msg.message,
-        replyText,
-      }),
+      headers: await adminHeaders(),
+      body: JSON.stringify({ id, replyText }),
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
@@ -266,12 +262,20 @@ export const analyticsAPI = {
 
 // --- SETTINGS API ---
 export const settingsAPI = {
-  getSettings: () => handleResponse(supabase.from('settings').select('*').eq('id', 'site_settings').single()),
+  // Admin: public settings + mail settings (stored in a closed table, read via server)
+  getSettings: async () => {
+    const [{ data }, emailRes] = await Promise.all([
+      handleResponse(supabase.from('settings').select('*').eq('id', 'site_settings').single()),
+      fetch('/api/email-settings', { headers: await adminHeaders() }),
+    ]);
+    const email = emailRes.ok ? (await emailRes.json()).data : {};
+    return { data: { ...data, email_provider: email.email_provider || {} } };
+  },
   updateSettings: async (data) => {
-    // Server-side save via service role key (bypasses RLS)
+    // Server-side save via service role key (bypasses RLS), admin only
     const response = await fetch('/api/save-settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await adminHeaders(),
       body: JSON.stringify(data),
     });
     const result = await response.json();
@@ -289,7 +293,7 @@ export const settingsAPI = {
   testEmail: async (toEmail) => {
     const response = await fetch('/api/test-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await adminHeaders(),
       body: JSON.stringify({ to: toEmail }),
     });
     if (!response.ok) {
